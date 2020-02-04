@@ -5327,7 +5327,8 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
   if (INTERPOLATION_ENABLED) {
     TxTreeGraph::updateBBInCpModule();
     // TxTreeGraph::printBBs(0);
-    TxTreeGraph::generatePSSCFG();
+    TxTreeGraph::generatePSSCFG(
+        interpreterHandler->getOutputFilename("psscfg.bc"));
     // TxTreeGraph::printBBs(1);
     TxTreeGraph::save(interpreterHandler->getOutputFilename("tree.dot"));
     TxTreeGraph::deallocate();

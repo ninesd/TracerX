@@ -211,7 +211,7 @@ public:
   static void copyTxTreeNodeData(TxTreeNode *txTreeNode);
   static void updateBBInCpModule();
 
-  static void generatePSSCFG();
+  static void generatePSSCFG(std::string psscfg);
   static void updateRef(llvm::Instruction *ins, llvm::ValueToValueMapTy &vmap);
   static void removeVal(llvm::ValueToValueMapTy &vmap,
                         std::vector<llvm::BasicBlock *> executedBBs);

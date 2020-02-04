@@ -464,7 +464,7 @@ void TxTreeGraph::updateBBInCpModule() {
   }
 }
 
-void TxTreeGraph::generatePSSCFG() {
+void TxTreeGraph::generatePSSCFG(std::string psscfg) {
   if (instance->root == NULL) {
     return;
   }
@@ -549,7 +549,7 @@ void TxTreeGraph::generatePSSCFG() {
 
   // dump to a new module
   std::string EC;
-  llvm::raw_fd_ostream OS("module.bc", EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream OS(psscfg.c_str(), EC, llvm::sys::fs::F_None);
   WriteBitcodeToFile(dupModule, OS);
   OS.flush();
 }
