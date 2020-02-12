@@ -559,41 +559,48 @@ void TxTreeGraph::updateBranchInsts() {
     return;
   }
 
-  // collect all nodes in graph using DFS
   std::vector<Node *> wl;
   wl.push_back(instance->root);
   while (!wl.empty()) {
-    Node *t = wl.back();
+    Node *n = wl.back();
     wl.pop_back();
-    if (!t->subsumed) {
-      for (unsigned i = 0; i < t->newExecutedBBs.size(); ++i) {
-        llvm::BasicBlock *bb = t->newExecutedBBs[i];
-        if (i == t->newExecutedBBs.size() - 1) { // the last BB in this node
+    if (!n->subsumed) {
+      for (unsigned i = 0; i < n->newExecutedBBs.size(); ++i) {
+        llvm::BasicBlock *bb = n->newExecutedBBs[i];
+        if (i == n->newExecutedBBs.size() - 1) { // the last BB in this node
           if (llvm::isa<llvm::BranchInst>(&bb->back())) {
             llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(&bb->back());
-            if (t->falseTarget != NULL && t->trueTarget != NULL) {
-              if (t->falseTarget->subsumed) {
-                createSubsumedBB(t->falseTarget);
+            if (n->falseTarget != NULL && n->trueTarget != NULL) {
+              llvm::BasicBlock *nextFalseBB = NULL;
+              llvm::BasicBlock *nextTrueBB = NULL;
+              if (n->falseTarget->subsumed) {
+                nextFalseBB = instance->subsumptionMap[n->falseTarget]
+                                  ->executedBBs.front();
+              } else {
+                nextFalseBB = n->falseTarget->executedBBs.front();
               }
-              if (t->trueTarget->subsumed) {
-                createSubsumedBB(t->trueTarget);
+              if (n->trueTarget->subsumed) {
+                nextTrueBB = instance->subsumptionMap[n->trueTarget]
+                                 ->executedBBs.front();
+              } else {
+                nextTrueBB = n->trueTarget->executedBBs.front();
               }
-              br->setSuccessor(0, t->trueTarget->newExecutedBBs.front());
-              br->setSuccessor(1, t->falseTarget->newExecutedBBs.front());
+              br->setSuccessor(0, nextTrueBB);
+              br->setSuccessor(1, nextFalseBB);
             }
           }
         } else { // internal
           bb->getInstList().pop_back();
           llvm::IRBuilder<> Builder(bb);
-          Builder.CreateBr(t->newExecutedBBs[i + 1]);
+          Builder.CreateBr(n->newExecutedBBs[i + 1]);
         }
       }
       // add 2 children to work list
-      if (t->trueTarget != NULL) {
-        wl.push_back(t->trueTarget);
+      if (n->trueTarget != NULL) {
+        wl.push_back(n->trueTarget);
       }
-      if (t->falseTarget != NULL) {
-        wl.push_back(t->falseTarget);
+      if (n->falseTarget != NULL) {
+        wl.push_back(n->falseTarget);
       }
     }
   }
