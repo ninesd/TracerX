@@ -125,6 +125,10 @@ ObjectState::ObjectState(const MemoryObject *mo)
       // variables for subsumption checking
       const Array *shadow = getArrayCache()->CreateArray(TxShadowArray::getShadowName(arrayName), arrayWidth);
       TxShadowArray::addShadowArrayMap(array, shadow);
+      if (DebugTracerX) {
+        llvm::errs() << "[getUpdates:addShadowArrayMap] arrayName:" << arrayName
+                     << " arrayWidth:" << arrayWidth << "\n";
+      }
     }
   }
   memset(concreteStore, 0, size);
@@ -249,6 +253,10 @@ const UpdateList &ObjectState::getUpdates() const {
       // variables for subsumption checking
       const Array *shadow = getArrayCache()->CreateArray(TxShadowArray::getShadowName(arrayName), arrayWidth);
       TxShadowArray::addShadowArrayMap(array, shadow);
+      if (DebugTracerX) {
+        llvm::errs() << "[getUpdates:addShadowArrayMap] arrayName:" << arrayName
+                     << " arrayWidth:" << arrayWidth << "\n";
+      }
     }
   }
 

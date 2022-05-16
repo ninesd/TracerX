@@ -690,10 +690,14 @@ void Executor::branch(ExecutionState &state,
       es->ptreeNode = res.second;
 
       if (INTERPOLATION_ENABLED) {
+        if (DebugTracerX)
+          llvm::errs() << "[branch:split] Node:" << es->txTreeNode->getNodeSequenceNumber() << " -> Node:";
         std::pair<TxTreeNode *, TxTreeNode *> ires =
             txTree->split(es->txTreeNode, ns, es);
         ns->txTreeNode = ires.first;
         es->txTreeNode = ires.second;
+        if (DebugTracerX)
+          llvm:: errs() << ires.first->getNodeSequenceNumber() << ", Node:" << ires.second->getNodeSequenceNumber() << "\n";
       }
     }
   }
@@ -900,6 +904,8 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
       // We then extract the unsatisfiability core of antecedent and not
       // consequent as the Craig interpolant.
       txTree->markPathCondition(current, unsatCore);
+      if (DebugTracerX)
+        llvm::errs() << "[fork:markPathCondition] branch=False, Node:" << current.txTreeNode->getNodeSequenceNumber() << "\n";
     }
 
     return StatePair(&current, 0);
@@ -915,6 +921,8 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
       // which means that antecedent -> not(consequent) is valid. In this
       // case also we extract the unsat core of the proof
       txTree->markPathCondition(current, unsatCore);
+      if (DebugTracerX)
+        llvm::errs() << "[fork:markPathCondition] branch=True, Node:" << current.txTreeNode->getNodeSequenceNumber() << "\n";
     }
 
     return StatePair(0, &current);
@@ -991,6 +999,9 @@ Executor::StatePair Executor::fork(ExecutionState &current, ref<Expr> condition,
           txTree->split(current.txTreeNode, falseState, trueState);
       falseState->txTreeNode = ires.first;
       trueState->txTreeNode = ires.second;
+      if (DebugTracerX)
+        llvm::errs() << "[fork:split] branch=Unknown, Node:" << current.txTreeNode->getNodeSequenceNumber()
+                     << " -> " << ires.first->getNodeSequenceNumber() << " : " << ires.second->getNodeSequenceNumber() << "\n";
     }
 
     addConstraint(*trueState, condition);
@@ -1475,6 +1486,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // We then extract the unsatisfiability core of antecedent and not
       // consequent as the Craig interpolant.
       txTree->markPathCondition(current, unsatCore);
+      if (DebugTracerX)
+        llvm::errs() << "[branchFork:markPathCondition] res=True, Node:" << current.txTreeNode->getNodeSequenceNumber() << "\n";
       if (WPInterpolant)
         txTree->markInstruction(current.prevPC, true);
     }
@@ -1589,6 +1602,8 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
       // which means that antecedent -> not(consequent) is valid. In this
       // case also we extract the unsat core of the proof
       txTree->markPathCondition(current, unsatCore);
+      if (DebugTracerX)
+        llvm::errs() << "[branchFork:markPathCondition] res=False, Node:" << current.txTreeNode->getNodeSequenceNumber() << "\n";
       if (WPInterpolant)
         txTree->markInstruction(current.prevPC, false);
     }
@@ -1668,6 +1683,9 @@ Executor::StatePair Executor::branchFork(ExecutionState &current,
           txTree->split(current.txTreeNode, falseState, trueState);
       falseState->txTreeNode = ires.first;
       trueState->txTreeNode = ires.second;
+      if (DebugTracerX)
+        llvm::errs() << "[branchFork:markPathCondition] branch=Unknown, Node:" << current.txTreeNode->getNodeSequenceNumber()
+                     << " -> " << ires.first->getNodeSequenceNumber() << " : " << ires.second->getNodeSequenceNumber() << "\n";
     }
 
     addConstraint(*trueState, condition);
@@ -2010,6 +2028,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       // We then extract the unsatisfiability core of antecedent and not
       // consequent as the Craig interpolant.
       txTree->markPathCondition(current, unsatCore);
+      if (DebugTracerX)
+        llvm::errs() << "[speculationFork:markPathCondition] branch=True, Node:" << current.txTreeNode->getNodeSequenceNumber() <<"\n";
       if (WPInterpolant)
         txTree->markInstruction(current.prevPC, true);
     }
@@ -2088,6 +2108,8 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
       // which means that antecedent -> not(consequent) is valid. In this
       // case also we extract the unsat core of the proof
       txTree->markPathCondition(current, unsatCore);
+      if (DebugTracerX)
+        llvm::errs() << "[speculationFork:markPathCondition] branch=False, Node:" << current.txTreeNode->getNodeSequenceNumber() <<"\n";
       if (WPInterpolant)
         txTree->markInstruction(current.prevPC, false);
     }
@@ -2132,6 +2154,10 @@ Executor::StatePair Executor::speculationFork(ExecutionState &current,
 
     falseState->txTreeNode = ires.first;
     trueState->txTreeNode = ires.second;
+    if (DebugTracerX)
+      llvm::errs() << "[speculationFork:split] branch=Unknown, Node:" << current.txTreeNode->getNodeSequenceNumber()
+                   << " -> " << ires.first->getNodeSequenceNumber() << " : " << ires.second->getNodeSequenceNumber() << "\n";
+
 
     if (res != Solver::False)
       addConstraint(*trueState, condition);
@@ -2411,6 +2437,13 @@ void Executor::executeGetValue(ExecutionState &state, ref<Expr> e,
 
     if (INTERPOLATION_ENABLED) {
       txTree->execute(target->inst, e, value);
+      if (DebugTracerX) {
+        llvm::errs() << "[executeGetValue:execute] Node:" << state.txTreeNode->getNodeSequenceNumber()
+                     << ", Inst:" << target->inst->getOpcodeName()
+                     << ", Value:";
+        value->print(llvm::errs());
+        llvm::errs() << "\n";
+      }
     }
   } else {
     std::set<ref<Expr> > values;
@@ -2441,8 +2474,16 @@ void Executor::executeGetValue(ExecutionState &state, ref<Expr> e,
       ExecutionState *es = *bit;
       if (es)
         bindLocal(target, *es, *vit);
-      if (INTERPOLATION_ENABLED)
+      if (INTERPOLATION_ENABLED) {
         TxTree::executeOnNode(es->txTreeNode, target->inst, e, *vit);
+        if (DebugTracerX) {
+          llvm::errs() << "[executeGetValue:executeOnNode] Node:" << es->txTreeNode->getNodeSequenceNumber()
+                       << ", Inst:" << target->inst->getOpcodeName()
+                       << ", Value:";
+          (*vit)->print(llvm::errs());
+          llvm::errs() << "\n";
+        }
+      }
       ++bit;
     }
   }
@@ -2669,9 +2710,13 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
     for (unsigned i = 0; i < numFormals; ++i)
       bindArgument(kf, i, state, arguments[i]);
 
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       // We bind the abstract dependency call arguments
       state.txTreeNode->bindCallArguments(state.prevPC->inst, arguments);
+      if (DebugTracerX)
+        llvm::errs() << "[executeCall:bindCallArguments] !f->isDeclaration(), Node:" << state.txTreeNode->getNodeSequenceNumber()
+                     << ", inst:" << state.prevPC->inst->getOpcodeName() << "\n";
+    }
   }
 }
 
@@ -3010,20 +3055,29 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         }
       }
     }
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] Unwind, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 #endif
   case Instruction::Br: {
     BranchInst *bi = cast<BranchInst>(i);
     // stop collecting phi values for the current node
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->setPhiValuesFlag(0);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:setPhiValuesFlag] Br, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     if (bi->isUnconditional()) {
       transferToBasicBlock(bi->getSuccessor(0), bi->getParent(), state);
-      if (INTERPOLATION_ENABLED)
+      if (INTERPOLATION_ENABLED) {
         txTree->execute(i);
+        if (DebugTracerX)
+          llvm::errs() << "[executeInstruction:execute] Br Unconditional, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+      }
     } else {
       // FIXME: Find a way that we don't have this hidden dependency.
       assert(bi->getCondition() == bi->getOperand(0) && "Wrong operand index!");
@@ -3055,8 +3109,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // of the solver to decide its satisfiability, and no generation
       // of the unsatisfiability core.
       if (INTERPOLATION_ENABLED && ((!branches.first && branches.second) ||
-                                    (branches.first && !branches.second)))
+                                    (branches.first && !branches.second))) {
         txTree->execute(i);
+        if (DebugTracerX)
+          llvm::errs() << "[executeInstruction:execute] Br, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+      }
     }
     break;
   }
@@ -3082,8 +3139,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 #endif
       transferToBasicBlock(si->getSuccessor(index), si->getParent(), state);
 
-      if (INTERPOLATION_ENABLED)
+      if (INTERPOLATION_ENABLED) {
         txTree->execute(i, oldCond);
+        if (DebugTracerX)
+          llvm::errs() << "[executeInstruction:execute] Switch, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+      }
     } else {
       // Handle possible different branch targets
 
@@ -3157,6 +3217,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
           // The solver returned no solution, which means there is an infeasible
           // branch: Mark the unsatisfiability core
           state.txTreeNode->unsatCoreInterpolation(unsatCore);
+          if (DebugTracerX)
+            llvm::errs() << "[executeInstruction:unsatCoreInterpolation] Switch, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
         }
       }
 
@@ -3177,6 +3239,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         // The solver returned no solution, which means the default branch
         // cannot be taken: Mark the unsatisfiability core
         state.txTreeNode->unsatCoreInterpolation(unsatCore);
+        if (DebugTracerX)
+          llvm::errs() << "[executeInstruction:unsatCoreInterpolation] Switch, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
       }
 
       // Fork the current state with each state having one of the possible
@@ -3331,8 +3395,14 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 #else
       txTree->executePHI(i, state.incomingBBIndex * 2, result);
 #endif
-      if (txTree->getPhiValuesFlag())
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:executePHI] PHI, Node:" << state.txTreeNode->getNodeSequenceNumber()
+                     << " : " << state.incomingBBIndex << "\n";
+      if (txTree->getPhiValuesFlag()) {
         txTree->setPhiValue(i, result);
+        if (DebugTracerX)
+          llvm::errs() << "[executeInstruction:setPhiValue] PHI, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+      }
     }
 
     break;
@@ -3347,8 +3417,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, tExpr, fExpr);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] Select, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -3365,8 +3438,16 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX) {
+        llvm::errs() << "[executeInstruction:execute] Add, Node:" << state.txTreeNode->getNodeSequenceNumber() << ", Left:";
+        left->print(llvm::errs());
+        llvm::errs() << " + Right:";
+        left->print(llvm::errs());
+        llvm::errs() << "\n";
+      }
+    }
     break;
   }
 
@@ -3377,8 +3458,16 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX) {
+        llvm::errs() << "[executeInstruction:execute] Sub, Node:" << state.txTreeNode->getNodeSequenceNumber() << ", Left:";
+        left->print(llvm::errs());
+        llvm::errs() << " - Right:";
+        left->print(llvm::errs());
+        llvm::errs() << "\n";
+      }
+    }
     break;
   }
 
@@ -3389,8 +3478,16 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX) {
+        llvm::errs() << "[executeInstruction:execute] Mul, Node:" << state.txTreeNode->getNodeSequenceNumber() << ", Left:";
+        left->print(llvm::errs());
+        llvm::errs() << " * Right:";
+        left->print(llvm::errs());
+        llvm::errs() << "\n";
+      }
+    }
     break;
   }
 
@@ -3401,8 +3498,16 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX) {
+        llvm::errs() << "[executeInstruction:execute] UDiv, Node:" << state.txTreeNode->getNodeSequenceNumber() << ", Left:";
+        left->print(llvm::errs());
+        llvm::errs() << " / Right:";
+        left->print(llvm::errs());
+        llvm::errs() << "\n";
+      }
+    }
     break;
   }
 
@@ -3413,8 +3518,16 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX) {
+        llvm::errs() << "[executeInstruction:execute] SDiv, Node:" << state.txTreeNode->getNodeSequenceNumber() << ", Left:";
+        left->print(llvm::errs());
+        llvm::errs() << " / Right:";
+        left->print(llvm::errs());
+        llvm::errs() << "\n";
+      }
+    }
     break;
   }
 
@@ -3425,8 +3538,16 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX) {
+        llvm::errs() << "[executeInstruction:execute] URem, Node:" << state.txTreeNode->getNodeSequenceNumber() << ", Left:";
+        left->print(llvm::errs());
+        llvm::errs() << " % Right:";
+        left->print(llvm::errs());
+        llvm::errs() << "\n";
+      }
+    }
     break;
   }
 
@@ -3437,8 +3558,16 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX) {
+        llvm::errs() << "[executeInstruction:execute] SRem, Node:" << state.txTreeNode->getNodeSequenceNumber() << ", Left:";
+        left->print(llvm::errs());
+        llvm::errs() << " % Right:";
+        left->print(llvm::errs());
+        llvm::errs() << "\n";
+      }
+    }
     break;
   }
 
@@ -3449,8 +3578,16 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX) {
+        llvm::errs() << "[executeInstruction:execute] And, Node:" << state.txTreeNode->getNodeSequenceNumber() << ", Left:";
+        left->print(llvm::errs());
+        llvm::errs() << " And Right:";
+        left->print(llvm::errs());
+        llvm::errs() << "\n";
+      }
+    }
     break;
   }
 
@@ -3461,8 +3598,16 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX) {
+        llvm::errs() << "[executeInstruction:execute] Or, Node:" << state.txTreeNode->getNodeSequenceNumber() << ", Left:";
+        left->print(llvm::errs());
+        llvm::errs() << "Or Right:";
+        left->print(llvm::errs());
+        llvm::errs() << "\n";
+      }
+    }
     break;
   }
 
@@ -3473,8 +3618,16 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX) {
+        llvm::errs() << "[executeInstruction:execute] Xor, Node:" << state.txTreeNode->getNodeSequenceNumber() << ", Left:";
+        left->print(llvm::errs());
+        llvm::errs() << " Xor Right:";
+        left->print(llvm::errs());
+        llvm::errs() << "\n";
+      }
+    }
     break;
   }
 
@@ -3485,8 +3638,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] Shl, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -3497,8 +3653,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+    if (DebugTracerX)
+      llvm::errs() << "[executeInstruction:execute] LShr, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -3509,8 +3668,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] AShr, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -3607,8 +3769,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     }
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] ICMP, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -3669,8 +3834,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, address);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, address, base, offset);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] GetElementPtr, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -3683,8 +3851,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, arg);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] Trunc, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
   case Instruction::ZExt: {
@@ -3695,8 +3866,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, arg);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] ZExt, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
   case Instruction::SExt: {
@@ -3707,8 +3881,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, arg);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] SExt, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -3720,8 +3897,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, arg);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] IntToPtr, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
   case Instruction::PtrToInt: {
@@ -3732,8 +3912,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, arg);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] PtrToInt, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -3742,8 +3925,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] BitCast, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -3772,8 +3958,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] FAdd, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -3799,8 +3988,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] FSub, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -3827,8 +4019,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] FMul, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -3855,8 +4050,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] FDiv, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -3882,8 +4080,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] FRem, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -3907,8 +4108,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, origArg);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] FPTrunc, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -3931,8 +4135,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, origArg);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] FPExt, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -3957,8 +4164,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, origArg);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] FPToUI, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -3983,8 +4193,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, origArg);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] FPToSI, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -4004,8 +4217,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, origArg);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] UIToFP, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -4025,8 +4241,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, origArg);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] SIToFP, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 
@@ -4128,8 +4347,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, left, right);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] FCmp, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
   case Instruction::InsertValue: {
@@ -4160,8 +4382,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, agg, val);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] InsertValue, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
   case Instruction::ExtractValue: {
@@ -4175,8 +4400,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     bindLocal(ki, state, result);
 
     // Update dependency
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->execute(i, result, agg);
+      if (DebugTracerX)
+        llvm::errs() << "[executeInstruction:execute] ExtractValue, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     break;
   }
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
@@ -4221,8 +4449,11 @@ void Executor::updateStates(ExecutionState *current) {
     if (it3 != seedMap.end())
       seedMap.erase(it3);
     processTree->remove(es->ptreeNode);
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->remove(es, solver, (current == 0));
+      if (DebugTracerX)
+        llvm::errs() << "[updateStates:remove] Node:" << es->txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     delete es;
   }
   removedStates.clear();
@@ -4521,6 +4752,8 @@ void Executor::run(ExecutionState &initialState) {
         // We synchronize the node id to that of the state. The node id is set
         // only when it was the address of the first instruction in the node.
         txTree->setCurrentINode(state);
+        if (DebugTracerX)
+          llvm::errs() << "[run:setCurrentINode] Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
       }
 
       stepInstruction(state);
@@ -4582,6 +4815,9 @@ void Executor::run(ExecutionState &initialState) {
       // is set only when it was the address of the first instruction
       // in the node.
       txTree->setCurrentINode(state);
+      if (DebugTracerX)
+        llvm::errs() << "[run:setCurrentINode] Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+
 
       uint64_t debugLevel = txTree->getDebugState();
 
@@ -4615,6 +4851,8 @@ void Executor::run(ExecutionState &initialState) {
     if (INTERPOLATION_ENABLED &&
         txTree->subsumptionCheck(solver, state, coreSolverTimeout)) {
       terminateStateOnSubsumption(state);
+      if (DebugTracerX)
+        llvm::errs() << "[run:subsumptionCheck] Pass, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
     } else {
       KInstruction *ki = state.pc;
       stepInstruction(state);
@@ -4622,6 +4860,8 @@ void Executor::run(ExecutionState &initialState) {
       executeInstruction(state, ki);
       if (INTERPOLATION_ENABLED) {
         state.txTreeNode->incInstructionsDepth();
+        if (DebugTracerX)
+          llvm::errs() << "[run:subsumptionCheck] Fail, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
       }
       processTimers(&state, MaxInstructionTime);
 
@@ -4707,8 +4947,11 @@ void Executor::terminateState(ExecutionState &state) {
     addedStates.erase(it);
     processTree->remove(state.ptreeNode);
 
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       txTree->remove(&state, solver, false);
+      if (DebugTracerX)
+        llvm::errs() << "[terminateState:remove] Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
     delete &state;
   }
 }
@@ -4854,12 +5097,18 @@ void Executor::terminateStateOnError(ExecutionState &state,
 
     if (termReason == Executor::Assert) {
       TxTreeGraph::setError(state, TxTreeGraph::ASSERTION);
+      if (DebugTracerX)
+        llvm::errs() << "[terminateStateOnError:setError] ASSERTION, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
     } else if (termReason == Executor::Ptr &&
                messaget.str() == "memory error: out of bound pointer") {
       TxTreeGraph::setError(state, TxTreeGraph::MEMORY);
+      if (DebugTracerX)
+        llvm::errs() << "[terminateStateOnError:setError] MEMORY, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
     } else {
       state.txTreeNode->setGenericEarlyTermination();
       TxTreeGraph::setError(state, TxTreeGraph::GENERIC);
+      if (DebugTracerX)
+        llvm::errs() << "[terminateStateOnError:setError] GENERIC, Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
     }
     if (WPInterpolant)
       state.txTreeNode->setAssertionFail(EmitAllErrors);
@@ -5010,6 +5259,9 @@ void Executor::callExternalFunction(ExecutionState &state, KInstruction *target,
         tmpArgs.push_back(arguments.at(i));
       }
       txTree->execute(target->inst, tmpArgs);
+      if (DebugTracerX)
+        llvm::errs() << "[callExternalFunction:execute] Node:" << state.txTreeNode->getNodeSequenceNumber()
+                     << ", Inst:" << target->inst->getOpcodeName() << "\n";
     }
   }
 }
@@ -5047,6 +5299,8 @@ ref<Expr> Executor::replaceReadWithSymbolic(ExecutionState &state,
     const Array *shadow = arrayCache.CreateArray(
         TxShadowArray::getShadowName(arrayName), arrayWidth);
     TxShadowArray::addShadowArrayMap(array, shadow);
+    if (DebugTracerX)
+      llvm::errs() << "[replaceReadWithSymbolic:addShadowArrayMap] Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
   }
 
   return res;
@@ -5088,8 +5342,12 @@ void Executor::executeAlloc(ExecutionState &state, ref<Expr> size, bool isLocal,
       bindLocal(target, state, mo->getBaseExpr());
 
       // Update dependency
-      if (INTERPOLATION_ENABLED)
+      if (INTERPOLATION_ENABLED) {
         txTree->execute(target->inst, mo->getBaseExpr(), size);
+        if (DebugTracerX)
+          llvm::errs() << "[executeAlloc:execute] Node:" << state.txTreeNode->getNodeSequenceNumber()
+                       << ", Inst:" << target->inst->getOpcodeName() << "\n";
+      }
 
       if (reallocFrom) {
         unsigned count = std::min(reallocFrom->size, os->size);
@@ -5157,8 +5415,12 @@ void Executor::executeAlloc(ExecutionState &state, ref<Expr> size, bool isLocal,
           bindLocal(target, *hugeSize.first, result);
 
           // Update dependency
-          if (INTERPOLATION_ENABLED)
+          if (INTERPOLATION_ENABLED) {
             txTree->execute(target->inst, result);
+            if (DebugTracerX)
+              llvm::errs() << "[executeAlloc:execute] symbolic, Node:" << state.txTreeNode->getNodeSequenceNumber()
+                           << ", Inst:" << target->inst->getOpcodeName()  << "\n";
+          }
         }
 
         if (hugeSize.second) {
@@ -5293,6 +5555,11 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
           wos->write(offset, value);
 
           // Update dependency
+          if (INTERPOLATION_ENABLED && target) {
+            if (DebugTracerX)
+              llvm::errs() << "[executeMemoryOperation:executeMemoryOperation] isWrite, Node:" << state.txTreeNode->getNodeSequenceNumber()
+                           << ", Inst:" << target->inst->getOpcodeName() << "\n";
+          }
           if (INTERPOLATION_ENABLED && target &&
               txTree->executeMemoryOperation(target->inst, value, address,
                                              inBounds)) {
@@ -5310,6 +5577,11 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
         bindLocal(target, state, result);
 
         // Update dependency
+        if (INTERPOLATION_ENABLED && target) {
+          if (DebugTracerX)
+            llvm::errs() << "[executeMemoryOperation:executeMemoryOperation] !isWrite, Node:" << state.txTreeNode->getNodeSequenceNumber()
+                         << ", Inst:" << target->inst->getOpcodeName() << "\n";
+        }
         if (INTERPOLATION_ENABLED && target &&
             txTree->executeMemoryOperation(target->inst, result, address,
                                            inBounds)) {
@@ -5354,18 +5626,27 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
           wos->write(mo->getOffsetExpr(address), value);
 
           // Update dependency
-          if (INTERPOLATION_ENABLED && target)
+          if (INTERPOLATION_ENABLED && target) {
             TxTree::executeOnNode(bound->txTreeNode, target->inst, value,
                                   address);
+            if (DebugTracerX)
+              llvm::errs() << "[executeMemoryOperation:executeOnNode] Node:" << state.txTreeNode->getNodeSequenceNumber()
+                           << ", Inst:" << target->inst->getOpcodeName() << "\n";
+
+          }
         }
       } else {
         ref<Expr> result = os->read(mo->getOffsetExpr(address), type);
         bindLocal(target, *bound, result);
 
         // Update dependency
-        if (INTERPOLATION_ENABLED && target)
+        if (INTERPOLATION_ENABLED && target) {
           TxTree::executeOnNode(bound->txTreeNode, target->inst, result,
                                 address);
+          if (DebugTracerX)
+            llvm::errs() << "[executeMemoryOperation:executeOnNode] Node:" << state.txTreeNode->getNodeSequenceNumber()
+                         << ", Inst:" << target->inst->getOpcodeName() << "\n";
+        }
       }
     }
 
@@ -5376,10 +5657,13 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
 
   // XXX should we distinguish out of bounds and overlapped cases?
   if (unbound) {
-    if (INTERPOLATION_ENABLED)
+    if (INTERPOLATION_ENABLED) {
       TxTree::symbolicExecutionError =
           true; // We let interpolation subsystem knows we are recovering from
                 // error, hence the previous expression may not be recorded
+      if (DebugTracerX)
+        llvm::errs() << "[executeMemoryOperation:symbolicExecutionError] Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
+    }
 
     if (incomplete) {
       terminateStateEarly(*unbound, "Query timed out (resolve).");
@@ -5387,6 +5671,9 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
       if (INTERPOLATION_ENABLED && target) {
         state.txTreeNode->memoryBoundViolationInterpolation(target->inst,
                                                             address);
+        if (DebugTracerX)
+          llvm::errs() << "[executeMemoryOperation:memoryBoundViolationInterpolation] Node:" << state.txTreeNode->getNodeSequenceNumber()
+                       << ", Inst:" << target->inst->getOpcodeName() << "\n";
       }
       terminateStateOnError(*unbound, "memory error: out of bound pointer", Ptr,
                             NULL, getAddressInfo(*unbound, address));
@@ -5414,6 +5701,8 @@ void Executor::executeMakeSymbolic(ExecutionState &state,
           TxShadowArray::getShadowName(uniqueName), mo->size);
       TxShadowArray::addShadowArrayMap(array, shadow);
       txTree->executeMakeSymbolic(state.prevPC->inst, mo->getBaseExpr(), array);
+      if (DebugTracerX)
+        llvm::errs() << "[executeMakeSymbolic:executeMakeSymbolic] Node:" << state.txTreeNode->getNodeSequenceNumber() << "\n";
     }
 
     bindObjectInState(state, mo, false, array);
@@ -5575,6 +5864,8 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
     txTree = new TxTree(state, kmodule->targetData, &globalAddresses);
     state->txTreeNode = txTree->root;
     TxTreeGraph::initialize(txTree->root);
+    if (DebugTracerX)
+      llvm::errs() << "[runFunctionAsMain:initialize]\n";
   }
 
   run(*state);
@@ -5584,6 +5875,8 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
   if (INTERPOLATION_ENABLED) {
     TxTreeGraph::save(interpreterHandler->getOutputFilename("tree.dot"));
     TxTreeGraph::deallocate();
+    if (DebugTracerX)
+      llvm::errs() << "[runFunctionAsMain:save]\n";
 
     delete txTree;
     txTree = 0;

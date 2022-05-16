@@ -1627,10 +1627,17 @@ setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
             solver->setTimeout(0);
           }
 
-          if (!success || result != Solver::True) {
+          if (!success) {
             if (debugSubsumptionLevel >= 1) {
-              klee_message("#%lu=>#%lu: Check failure as solved did not decide "
-                           "validity of existentially-quantified query",
+              klee_message("#%lu=>#%lu: Check failure as solver existentially-quantified query not success",
+                           state.txTreeNode->getNodeSequenceNumber(),
+                           nodeSequenceNumber);
+            }
+            return false;
+          }
+          else if (result != Solver::True) {
+            if (debugSubsumptionLevel >= 1) {
+              klee_message("#%lu=>#%lu: Check failure as existentially-quantified query expression not true",
                            state.txTreeNode->getNodeSequenceNumber(),
                            nodeSequenceNumber);
             }
@@ -1650,11 +1657,19 @@ setDebugSubsumptionLevelTxTree(debugSubsumptionLevel);
         success = solver->evaluate(state, expr, result, unsatCore);
         solver->setTimeout(0);
 
-        if (!success || result != Solver::True) {
+        if (!success) {
           if (debugSubsumptionLevel >= 1) {
-            klee_message(
-                "#%lu=>#%lu: Check failure as solved did not decide validity",
-                state.txTreeNode->getNodeSequenceNumber(), nodeSequenceNumber);
+            klee_message("#%lu=>#%lu: Check failure as solver query not success",
+                         state.txTreeNode->getNodeSequenceNumber(),
+                         nodeSequenceNumber);
+          }
+          return false;
+        }
+        else if (result != Solver::True) {
+          if (debugSubsumptionLevel >= 1) {
+            klee_message("#%lu=>#%lu: Check failure as query expression not true",
+                         state.txTreeNode->getNodeSequenceNumber(),
+                         nodeSequenceNumber);
           }
           return false;
         }

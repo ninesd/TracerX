@@ -214,6 +214,11 @@ MarkGlobal("mark-global",
            llvm::cl::desc("Decide whether global variables are marked or not"),
            llvm::cl::init(true));
 
+llvm::cl::opt<bool>
+    DebugTracerX("debug-tracerx",
+                 llvm::cl::desc("Output Debug Info for TracerX (default=false)."),
+                 llvm::cl::init(false));
+
 #endif // ENABLE_Z3
 
 #ifdef ENABLE_METASMT

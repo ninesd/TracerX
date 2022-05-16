@@ -122,8 +122,16 @@ void ExecutionState::addTxTreeConstraint(ref<Expr> e,
 
   if (txTreeNode && binstr && binstr->isConditional()) {
     txTreeNode->addConstraint(e, binstr->getCondition());
+    if (DebugTracerX) {
+      llvm::errs() << "[addConstraint:addConstraint] Node:" << txTreeNode->getNodeSequenceNumber()
+                   << ", Inst:" << instr->getOpcodeName() << "\n";
+    }
   } else if (txTreeNode && !binstr) {
     txTreeNode->addConstraint(e, instr->getOperand(0));
+    if (DebugTracerX) {
+      llvm::errs() << "[addConstraint:addConstraint] Node:" << txTreeNode->getNodeSequenceNumber()
+                   << ", Inst:" << instr->getOpcodeName() << "\n";
+    }
   }
 
 }
